@@ -12,6 +12,7 @@
 #include "SharedLibrary.hpp"
 #include "test.hpp"
 #include "MainThread.hpp"
+#include "BrainPlugins.hpp"
 bool loadFile(const char* fileName, Elysia::Genome::Genome &retval) {
     FILE * fp=fopen(fileName,"rb");
     if (!fp) return false;
@@ -37,9 +38,13 @@ bool loadFile(const char* fileName, Elysia::Genome::Genome &retval) {
 }
 void nilDestroy() {}
 Elysia::SharedLibrary gVis(Elysia::SharedLibrary::prefix()+"vis"+Elysia::SharedLibrary::postfix()+Elysia::SharedLibrary::extension());
+
+Elysia::SharedLibrary gCanvas(Elysia::SharedLibrary::prefix()+"canvas"+Elysia::SharedLibrary::postfix()+Elysia::SharedLibrary::extension());
+
 typedef std::map<std::string,std::shared_ptr<Elysia::SharedLibrary> > DevelopmentPluginMap;
 DevelopmentPluginMap gPlugins;
 bool loadedVis=false;
+bool loadedCanvas=false;
 
 void destroyDevelopmentPlugins() {
     void (*destroy)()=&nilDestroy;
@@ -53,15 +58,21 @@ void destroyDevelopmentPlugins() {
 
 int asyncMain(int argc, char**argv, bool loadvis) {
     void (*destroy)()=&nilDestroy;
+    void (*canvasDestroy)()=&nilDestroy;
     if (loadvis) {
-      if (!loadedVis) {
-        std::cerr<<"Failed to load vis library\n";
-      }else {
-        void (*init)();
-        init=(void(*)())gVis.symbol("init");
-        destroy=(void(*)())gVis.symbol("destroy");
-        (*init)();
-      }
+        
+        if (loadedVis == false || loadedCanvas == false) {
+            std::cerr<<"Failed to load vis or canvas library\n";
+        }else {
+            void (*canvasInit)();
+            canvasInit=(void(*)())gCanvas.symbol("init");
+            canvasDestroy=(void(*)())gCanvas.symbol("destroy");
+            (*canvasInit)();
+            void (*init)();
+            init=(void(*)())gVis.symbol("init");
+            destroy=(void(*)())gVis.symbol("destroy");
+            (*init)();
+        }
     }
     {
         void (*init)();
@@ -71,7 +82,7 @@ int asyncMain(int argc, char**argv, bool loadvis) {
                 (*init)();            
         }      
     }
-    
+    Elysia::BrainPlugins::constructCanvasOrGetLast("", "sdl", 1024, 768);
     Elysia::Vector3f test(0,1,2);
     std::unordered_map<Elysia::String,Elysia::Vector3f> bleh;
     bleh["ahoy"]=test;
@@ -83,6 +94,8 @@ int asyncMain(int argc, char**argv, bool loadvis) {
 			printf("%d",retval);
             if (destroy)
                 (*destroy)();
+            if (canvasDestroy)
+                (*canvasDestroy)();
             destroyDevelopmentPlugins();
             return retval;
 		}
@@ -102,6 +115,7 @@ int asyncMain(int argc, char**argv, bool loadvis) {
 
 	
     (*destroy)();
+    (*canvasDestroy)();
     destroyDevelopmentPlugins();
 	
 
@@ -136,8 +150,11 @@ int main(int argc, char **argv) {
           --i;
       }
     }
-    if (loadvis)
-      loadedVis =gVis.load();
+    if (loadvis) {
+        loadedCanvas =gCanvas.load();
+        loadedVis =gVis.load();
+        loadDevelLib("platformer");
+    }
     std::vector<std::string> failedPlugins;
     for (DevelopmentPluginMap::iterator i=gPlugins.begin(),ie=gPlugins.end();i!=ie;++i) {
         if (!i->second->load()) {

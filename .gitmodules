@@ -10,3 +10,6 @@
 [submodule "externals/sirikata"]
 	path = externals/sirikata
 	url = git://github.com/sirikata/sirikata.git
+[submodule "externals/polarity"]
+	path = externals/polarity
+	url = https://github.com/cookingclub/polarity.git
