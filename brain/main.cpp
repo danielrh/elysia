@@ -109,7 +109,10 @@ int asyncMain(int argc, char**argv, bool loadvis) {
 	Elysia::Brain brain(&(new Elysia::SimpleProteinEnvironment)->initialize(genes), new Elysia::SimpleSpatialSearch);
 	//std::vector<Branch *>BranchestoWipe;
     for (size_t i=0;i<1000;++i) {
-        brain.tick();
+        bool should_continue = brain.tick();
+        if (!should_continue) {
+            break;
+        }
     }
     
 

@@ -99,8 +99,9 @@ Neuron * Brain::addNeuron(const BoundingBox3f3f&generationArea, const Genome::Ge
  *					 - increments the current time in the simulation
  *					 - ages the brain
  *					 - updates all the plugins for this brain
+ *  Returns true if the simulation should continue
 **/
-void Brain::tick(){
+bool Brain::tick(){
 	processNeuron();
 	processSynapse();
 	developAllNeurons();
@@ -109,13 +110,42 @@ void Brain::tick(){
 	if(mDevelopmentCounter%10 == 0)this->processDevelopment();
     mAge+=1.0e-6;//fixme this is probably not correct: we probably need genes to do this
     if (mAge>1.0) mAge=1.0;
-    drawFrame();
+    return drawFrame();
 }
 
-void Brain::drawFrame() {
+bool Brain::drawFrame() {
+    bool should_continue = true;
+    std::vector<BrainPlugin*> focusToSelectFrom;
+    BrainPlugin *newlyUnfocused = NULL;
     for(std::vector<BrainPlugin*>::iterator i=mPlugins.begin(),ie=mPlugins.end();i!=ie;++i) {
-        (*i)->update();
+        auto update_return_code = (*i)->update();
+        if (update_return_code == BrainPlugin::RETURN_RELINQUISH_FOCUS && newlyUnfocused == NULL && (*i)->setFocus(false)) {
+            newlyUnfocused = *i;
+        }
+        if (update_return_code == BrainPlugin::RETURN_QUIT) {
+            should_continue = false;
+        }
     }
+    if (newlyUnfocused) {
+        bool hasSetFocus = false;
+        BrainPlugin *newlyFocused = NULL;
+        for(std::vector<BrainPlugin*>::iterator i=mPlugins.begin(),ie=mPlugins.end();i!=ie;++i) {
+            if (newlyUnfocused != *i) {
+                if (hasSetFocus == false && (*i)->setFocus(true)) {
+                    newlyFocused = *i;
+                    hasSetFocus = true;
+                } else {
+                    focusToSelectFrom.push_back(*i);
+                }
+            }
+        }
+        focusToSelectFrom.push_back(newlyUnfocused);
+        if (newlyFocused) {
+            focusToSelectFrom.push_back(newlyFocused);
+        }
+        focusToSelectFrom.swap(mPlugins);
+    }
+    return should_continue;
 }
 
 void Brain::developAllNeurons(){

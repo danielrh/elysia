@@ -1,4 +1,8 @@
 #include "BrainPlugin.hpp"
+#include <graphics/canvas.hpp>
+namespace Polarity {
+class Canvas;
+}
 namespace Elysia {
 class Brain;
 class CellComponent;
@@ -6,6 +10,10 @@ class GraphicsSystem;
 class Neuron;
 class Branch;
 class Visualization:public BrainPlugin  {
+    SDL_Event *mEvent;
+    std::shared_ptr<Polarity::Canvas> mCanvas;
+    bool mIsFocused;
+    bool processWindowEvents();
     ///Neurons marked for death by the main plugin
     std::vector<Neuron*> mfd;
     void clearDetail();
@@ -43,8 +51,9 @@ class Visualization:public BrainPlugin  {
 public:
     Visualization();
     void draw();
-    void update();
+    BrainPlugin::UpdateReturn update();
     void initialize(Brain*b);
+    bool setFocus(bool focused);
     void notifyNeuronDestruction(Neuron*n);
     ~Visualization();
     struct Event {

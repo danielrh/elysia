@@ -1,4 +1,5 @@
 #include "../../Platform.hpp"
+#include "../../BrainPlugins.hpp"
 #include "genome.pb.h"
 #include "Visualization.hpp"
 #include "GraphicsSystem.hpp"
@@ -12,6 +13,9 @@
 #include "Neuron.hpp"
 #include "Brain.hpp"
 #include "Synapse.hpp"
+
+
+using Polarity::Canvas;
 namespace Elysia {
 extern std::auto_ptr<std::mutex >gRenderLock;
 extern std::condition_variable gRenderCondition;
@@ -24,7 +28,8 @@ BrainPlugin* makeVisualization(Brain*b) {
     v->initialize(b);
     return v;
 }
-Visualization::Visualization(){
+Visualization::Visualization() : mCanvas(BrainPlugins::returnConstructedCanvas()) {
+    mEvent = mCanvas->makeBlankEventUnion();
     std::unique_lock<std::mutex> renderLock(*gRenderLock);
     if (std::find(gToRender.begin(),gToRender.end(),this)==gToRender.end()) {
         gToRender.push_back(this);
@@ -34,7 +39,24 @@ Visualization::Visualization(){
     mScale=100.0;
     mOffset=Vector3f(0,0,0);
 }
-void Visualization::update() {
+
+bool Visualization::processWindowEvents() {
+    while (mCanvas->getNextEvent(mEvent)) {
+        auto canvas = mCanvas;
+        if (!GraphicsSystem::processSDLEvent(this, canvas.get(), mEvent)) {
+                return false;
+        }
+    }
+    return true;
+}
+
+BrainPlugin::UpdateReturn Visualization::update() {
+    BrainPlugin::UpdateReturn retval = RETURN_NOP;
+    if (mIsFocused) {
+        if (!processWindowEvents()) {
+            return RETURN_RELINQUISH_FOCUS;
+        }
+    }
     {
         std::unique_lock<std::mutex> renderLock(*gRenderLock);    
         gRenderCondition.notify_one();
@@ -44,7 +66,14 @@ void Visualization::update() {
         std::unique_lock<std::mutex> renderLock(*gRenderLock);    
         gRenderCompleteCondition.wait(renderLock);
     }
+    return retval;
 }
+
+bool Visualization::setFocus(bool value) {
+    mIsFocused = value;
+    return true;
+}
+
 void Visualization::initialize( Brain*b) {
     mGraphics=mGlobalGraphics.lock();
     if (!mGraphics) {
@@ -461,15 +490,18 @@ void Visualization::InputStateMachine::draw(Visualization*parent) {
 }
 void Visualization::InputStateMachine::processPersistentState(const Visualization::Event&evt) {
     const Visualization::Event* i=&evt;
-    mMouseX=i->mouseX;
-    mMouseY=i->mouseY;
     switch(i->event) {
       case Event::MOUSE_CLICK:
+        mMouseX=i->mouseX;
+        mMouseY=i->mouseY;
         if (i->button<(int)(sizeof(mMouseButtons)/sizeof(mMouseButtons[0]))) {
             mMouseButtons[i->button]=1;
         }
         break;
       case Event::MOUSE_UP:
+
+        mMouseX=i->mouseX;
+        mMouseY=i->mouseY;
         if (i->button<(int)(sizeof(mMouseButtons)/sizeof(mMouseButtons[0]))) {
             mMouseButtons[i->button]=0;
         }
@@ -489,8 +521,12 @@ void Visualization::InputStateMachine::processPersistentState(const Visualizatio
             mSpecialKeyDown[i->button]=0;
         break;
       case Event::MOUSE_DRAG:
+        mMouseX=i->mouseX;
+        mMouseY=i->mouseY;
         break;
       case Event::MOUSE_MOVE:
+        mMouseX=i->mouseX;
+        mMouseY=i->mouseY;
         break;
     }
 
@@ -722,6 +758,7 @@ void Visualization::draw() {
 }
 Visualization::~Visualization() {
     {
+        mCanvas->destroyEventUnion(mEvent);
         std::unique_lock<std::mutex> renderLock(*gRenderLock);
         std::vector<Visualization*>::iterator where=std::find(gToRender.begin(),gToRender.end(),this);
         if (where!=gToRender.end()) {

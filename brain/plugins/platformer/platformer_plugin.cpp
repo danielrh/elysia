@@ -9,8 +9,10 @@ class SubGame : public BrainPlugin {
     Brain * brain;
     std::shared_ptr<Polarity::Canvas> canvas;
     SDL_Event *event;
+    bool isFocused;
 public:
     SubGame(const std::shared_ptr<Polarity::Canvas> &global_canvas):canvas(global_canvas){
+        isFocused = true;
         brain = NULL;
         event = canvas->makeBlankEventUnion();
     }
@@ -18,18 +20,24 @@ public:
         this->brain = b;
         Polarity::Game::getSingleton().startGame(canvas, "assets/levels/level2.tmx");
     }
-    void update() {
+    bool setFocus(bool focused) {
+        isFocused = focused;
+        return true;
+    }
+    UpdateReturn update() {
         if (!canvas) {
-            return;
+            return RETURN_NOP;      
         }
-        while (canvas->getNextEvent(event)) {
-            if (!Polarity::Game::getSingleton().injectInput(event)) {
-                Polarity::Game::getSingleton().stopGame();
-                canvas.reset();
-                return; // FIXME this terminates our game
+        UpdateReturn retval;
+        if (isFocused) {
+            while (canvas->getNextEvent(event)) {
+                if (!Polarity::Game::getSingleton().injectInput(event)) {
+                    return RETURN_RELINQUISH_FOCUS;
+                }
             }
         }
         Polarity::Game::getSingleton().performTick();
+        return RETURN_NOP;
     }
     void notifyNeuronDestruction(Neuron* n) {
     }

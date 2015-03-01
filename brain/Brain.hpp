@@ -51,8 +51,8 @@ public:
     //typedef std::set<Synapse*> SynapseSet;
 	//SynapseSet mAllSynapses;					//Removed due to lack of purpose
     BoundingBox3f3f getBounds()const;
-    void tick();
-    void drawFrame();
+    bool tick();
+    bool drawFrame(); // returns false if the program should exit
 	void processSynapse();
 	void processNeuron();
 	void developAllNeurons();

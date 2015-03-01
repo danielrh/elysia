@@ -11,6 +11,13 @@
 //#include <GL/freeglut.h>
 #endif
 #include "Visualization.hpp"
+#ifdef USE_SDL2
+#include <SDL2/SDL.h>
+#else
+#include <SDL/SDL.h>
+#endif
+
+
 int GAngle=0;
 volatile bool gKillGraphics=false;
 volatile bool gShutDown=false;
@@ -354,4 +361,72 @@ GraphicsSystem::~GraphicsSystem () {
     gKillGraphics=true;
           
 }
+
+bool GraphicsSystem::processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
+                                     SDL_Event *event) {
+    if (event->type == SDL_VIDEORESIZE) {
+        //event->type == SDL_WINDOWEVENT_RESIZED // <- for SDL2, which we don't need
+        canvas->resize(event->resize.w, event->resize.h);
+    } else if(event->type == SDL_KEYDOWN && event->key.keysym.sym == SDLK_ESCAPE) {
+        return false;
+    } else {
+        Visualization::Event evt;
+        switch(event->type) {
+          case SDL_KEYDOWN:
+          case SDL_KEYUP: {
+              auto keyData = event->key.keysym.sym;            
+              evt.button = keyData % 256;
+              
+              evt.modCodes = event->key.keysym.mod;
+              evt.mouseX = 0;
+              evt.mouseY = 0;
+              if (keyData < 256) {
+                  if (event->type == SDL_KEYDOWN) {
+                      evt.event = Visualization::Event::KEYBOARD;
+                  } else {
+                      evt.event = Visualization::Event::KEYBOARD_UP;
+                  }
+              }else {
+                  if (event->type == SDL_KEYDOWN) {
+                      evt.event = Visualization::Event::KEYBOARD_SPECIAL;
+                  } else {
+                      evt.event = Visualization::Event::KEYBOARD_SPECIAL_UP;
+                  }
+              }
+              break;
+          }
+          case SDL_MOUSEBUTTONDOWN:
+          case SDL_MOUSEBUTTONUP:
+            evt.button = event->button.button - 1;
+            evt.modCodes = 0;
+            assert(gToRender.size() == 1); // we don't need this any longer
+            getSystemWindowAndCoordsFromMouse(event->button.x,event->button.y,
+                                              evt.mouseX, evt.mouseY);
+            if (event->type == SDL_MOUSEBUTTONDOWN) {
+                evt.event=Visualization::Event::MOUSE_CLICK;
+            }else if (event->type == SDL_MOUSEBUTTONUP) {
+                evt.event=Visualization::Event::MOUSE_UP;
+            } else {
+                assert(false && "this should only activate for mouse clicks");
+            }
+            break;
+          case SDL_MOUSEMOTION:
+            evt.event=Visualization::Event::MOUSE_MOVE;
+            evt.modCodes = 0;
+            for (int i = 0; i < 8; ++i) {
+                if (event->motion.state & SDL_BUTTON(i + 1)) {
+                    evt.button = i;
+                    evt.event=Visualization::Event::MOUSE_DRAG;
+                    break;
+                }
+            }
+            getSystemWindowAndCoordsFromMouse(event->motion.x,event->motion.y,
+                                              evt.mouseX, evt.mouseY);
+            break;
+        }
+        vis->postInputEvent(evt);
+    }
+    return true;
+}
+
 }
