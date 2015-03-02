@@ -16,12 +16,12 @@
 #   endif
 #   define BRAIN_CORE_PLUGIN_EXPORT __declspec(dllexport)
 # else
-#   if defined(__GNUC__) && __GNUC__ >= 4
-#     define BRAIN_CORE_EXPORT __attribute__ ((visibility("default")))
-#     define BRAIN_CORE_PLUGIN_EXPORT __attribute__ ((visibility("default")))
-#   else
+#   if defined(STATIC_LINKED)
 #     define BRAIN_CORE_EXPORT
 #     define BRAIN_CORE_PLUGIN_EXPORT
+#   else
+#     define BRAIN_CORE_EXPORT __attribute__ ((visibility("default")))
+#     define BRAIN_CORE_PLUGIN_EXPORT __attribute__ ((visibility("default")))
 #   endif
 # endif
 #endif

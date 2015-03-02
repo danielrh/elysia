@@ -364,10 +364,13 @@ GraphicsSystem::~GraphicsSystem () {
 
 bool GraphicsSystem::processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
                                      SDL_Event *event) {
+#ifndef USE_SDL2
     if (event->type == SDL_VIDEORESIZE) {
         //event->type == SDL_WINDOWEVENT_RESIZED // <- for SDL2, which we don't need
         canvas->resize(event->resize.w, event->resize.h);
-    } else if(event->type == SDL_KEYDOWN && event->key.keysym.sym == SDLK_ESCAPE) {
+    } else
+#endif
+    if(event->type == SDL_KEYDOWN && event->key.keysym.sym == SDLK_ESCAPE) {
         return false;
     } else {
         Visualization::Event evt;
