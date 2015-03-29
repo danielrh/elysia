@@ -583,6 +583,7 @@ void Visualization::Button::draw(Visualization * parent) {
     
     Vector3f lower_left(recenterMinX-parent->mCanvas->width()/2,recenterMinY-parent->mCanvas->height()/2,0);
     Vector3f upper_right(recenterMaxX-parent->mCanvas->width()/2,recenterMaxY-parent->mCanvas->height()/2,0);
+    parent->drawRect(lower_left,upper_right, Polarity::Color(255, 255, 255, 255));
     lower_left.x += parent->mPadding >> 1;
     upper_right.x += parent->mPadding >> 1;
     parent->drawString(lower_left,mScale,mText,false);
