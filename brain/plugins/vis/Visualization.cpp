@@ -19,11 +19,6 @@ static Polarity::Color toColor(const Vector4f&c) {
                            c.z * 255,
                            c.w * 255);
 }
-extern std::auto_ptr<std::mutex >gRenderLock;
-extern std::condition_variable gRenderCondition;
-extern std::condition_variable gRenderCompleteCondition;
-
-extern std::vector<Visualization*> gToRender;
 std::weak_ptr<GraphicsSystem> Visualization::mGlobalGraphics;
 BrainPlugin* makeVisualization(Brain*b) {
     BrainPlugin*v=new Visualization;
@@ -32,14 +27,11 @@ BrainPlugin* makeVisualization(Brain*b) {
 }
 Visualization::Visualization() : mCanvas(BrainPlugins::returnConstructedCanvas()), fontSize(12), fontName("DroidSans"), mPadding(4) {
     mEvent = mCanvas->makeBlankEventUnion();
-    std::unique_lock<std::mutex> renderLock(*gRenderLock);
-    if (std::find(gToRender.begin(),gToRender.end(),this)==gToRender.end()) {
-        gToRender.push_back(this);
-    }
     mNeuronSize=.5;
     mSynapseSnapToEdge=true;
     mScale=100.0;
     mOffset=Vector3f(0,0,0);
+    mInput.init(this);
 }
 
 bool Visualization::processWindowEvents() {
@@ -58,15 +50,7 @@ BrainPlugin::UpdateReturn Visualization::update() {
         if (!processWindowEvents()) {
             return RETURN_RELINQUISH_FOCUS;
         }
-    }
-    {
-        std::unique_lock<std::mutex> renderLock(*gRenderLock);    
-        gRenderCondition.notify_one();
-    }
-
-    {
-        std::unique_lock<std::mutex> renderLock(*gRenderLock);    
-        gRenderCompleteCondition.wait(renderLock);
+        draw();
     }
     return retval;
 }
@@ -76,14 +60,7 @@ bool Visualization::setFocus(bool value) {
     return true;
 }
 
-void Visualization::initialize( Brain*b) {
-    mGraphics=mGlobalGraphics.lock();
-    if (!mGraphics) {
-        std::shared_ptr<GraphicsSystem> tmp(new GraphicsSystem());
-        mGraphics = tmp;
-        mGlobalGraphics=tmp;
-    }
-    
+void Visualization::initialize(Brain*b) {
     this->mBrain=b;
     BoundingBox3f3f bounds = b->getBounds();
     if (bounds==BoundingBox3f3f::null()) {
@@ -446,17 +423,16 @@ void Visualization::drawAndScreenTransformBox(const Vector3f &v0,
     mCanvas->drawLine(t1.first, t0.second, t0.first, t0.second, color);
 }
 
+void Visualization::InputStateMachine::init(Visualization*parent) {
+    mButtons.push_back(Button(0,20,20,35,"Add To Detail",std::bind(&Visualization::addSelectedToDetail,parent)));
+    mButtons.push_back(Button(0,40,20,55,"Subtract from Detail",std::bind(&Visualization::subtractSelectedFromDetail,parent)));
+    mButtons.push_back(Button(0,60,20,75,"Intersect with Detail",std::bind(&Visualization::intersectSelectedWithDetail,parent)));
+    mButtons.push_back(Button(0,0,10,15,"Clear Detail Display",std::bind(&Visualization::clearDetail,parent)));
+    mButtons.push_back(Button(0,80,20,95,"Add All To Detail Display",std::bind(&Visualization::addAllToDetail,parent)));
+    mButtons.push_back(Button(0,100,15,115,"Select All",std::bind(&Visualization::selectAll,parent)));
+}
+
 void Visualization::InputStateMachine::draw(Visualization*parent) {
-    static bool xx=false;
-    if (!xx) {
-        xx=true;
-        mButtons.push_back(Button(0,20,20,35,"Add To Detail",std::bind(&Visualization::addSelectedToDetail,parent)));
-        mButtons.push_back(Button(0,40,20,55,"Subtract from Detail",std::bind(&Visualization::subtractSelectedFromDetail,parent)));
-        mButtons.push_back(Button(0,60,20,75,"Intersect with Detail",std::bind(&Visualization::intersectSelectedWithDetail,parent)));
-        mButtons.push_back(Button(0,0,10,15,"Clear Detail Display",std::bind(&Visualization::clearDetail,parent)));
-        mButtons.push_back(Button(0,80,20,95,"Add All To Detail Display",std::bind(&Visualization::addAllToDetail,parent)));
-        mButtons.push_back(Button(0,100,15,115,"Select All",std::bind(&Visualization::selectAll,parent)));
-    }
     for (size_t i=0;i<mButtons.size();++i) {
         mButtons[i].draw(parent);
     }
@@ -521,8 +497,8 @@ void Visualization::Button::doClick(Visualization*vis, const Visualization::Even
     }
 }
 bool Visualization::Button::click(Visualization*parent, const Visualization::Event&evt) const{
-    if (evt.mouseX<=maxX-parent->mGraphics->getWidth()/2&&evt.mouseX>=minX-parent->mGraphics->getWidth()/2&&
-        evt.mouseY<=maxY-parent->mGraphics->getHeight()/2&&evt.mouseY>=minY-parent->mGraphics->getHeight()/2) {
+    if (evt.mouseX<=maxX-parent->mCanvas->width()/2&&evt.mouseX>=minX-parent->mCanvas->width()/2&&
+        evt.mouseY<=maxY-parent->mCanvas->height()/2&&evt.mouseY>=minY-parent->mCanvas->height()/2) {
         return true;
     }    
     return false;
@@ -605,8 +581,8 @@ void Visualization::Button::draw(Visualization * parent) {
     float recenterMaxX=maxX;
     float recenterMaxY=maxY;
     
-    Vector3f lower_left(recenterMinX-parent->mGraphics->getWidth()/2,recenterMinY-parent->mGraphics->getHeight()/2,0);
-    Vector3f upper_right(recenterMaxX-parent->mGraphics->getWidth()/2,recenterMaxY-parent->mGraphics->getHeight()/2,0);
+    Vector3f lower_left(recenterMinX-parent->mCanvas->width()/2,recenterMinY-parent->mCanvas->height()/2,0);
+    Vector3f upper_right(recenterMaxX-parent->mCanvas->width()/2,recenterMaxY-parent->mCanvas->height()/2,0);
     lower_left.x += parent->mPadding >> 1;
     upper_right.x += parent->mPadding >> 1;
     parent->drawString(lower_left,mScale,mText,false);
@@ -725,17 +701,7 @@ void Visualization::draw() {
     }
 }
 Visualization::~Visualization() {
-    {
-        mCanvas->destroyEventUnion(mEvent);
-        std::unique_lock<std::mutex> renderLock(*gRenderLock);
-        std::vector<Visualization*>::iterator where=std::find(gToRender.begin(),gToRender.end(),this);
-        if (where!=gToRender.end()) {
-            gToRender.erase(where);
-        }
-        
-    }
-    mGraphics=std::shared_ptr<GraphicsSystem>();
-
+    mCanvas->destroyEventUnion(mEvent);
 }
 void Visualization::notifyNeuronDestruction(Neuron*n){
     mfd.push_back(n);

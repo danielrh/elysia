@@ -16,8 +16,4 @@ public:
     ~GraphicsSystem();
     static bool processSDLEvent(Visualization * vis, Polarity::Canvas *, SDL_Event *evt);
 };
-extern int glutKeyDown[256];
-extern int glutSpecialKeyDown[256];
-
-void Deinitialize();
 }

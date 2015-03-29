@@ -106,20 +106,21 @@ int asyncMain(int argc, char**argv, bool loadvis) {
             printf("Success loading saved file\n");
         }
     }
-	Elysia::Brain brain(&(new Elysia::SimpleProteinEnvironment)->initialize(genes), new Elysia::SimpleSpatialSearch);
-	//std::vector<Branch *>BranchestoWipe;
-    for (size_t i=0;i<10000;++i) {
-        bool should_continue = brain.tick();
-        if (!should_continue) {
-            break;
+    {
+        Elysia::Brain brain(&(new Elysia::SimpleProteinEnvironment)->initialize(genes), new Elysia::SimpleSpatialSearch);
+        //std::vector<Branch *>BranchestoWipe;
+        for (size_t i=0;i<10000;++i) {
+            bool should_continue = brain.tick();
+            if (!should_continue) {
+                break;
+            }
         }
     }
-    
 
 	
     (*destroy)();
-    (*canvasDestroy)();
     destroyDevelopmentPlugins();
+    (*canvasDestroy)();
 	
 
 	return 0;

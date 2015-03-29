@@ -138,6 +138,7 @@ private:
         InputStateMachine();
         
         void draw(Visualization*parent);
+        void init(Visualization *parent);
     }mInput;
 };
 BrainPlugin* makeVisualization(Brain*b);

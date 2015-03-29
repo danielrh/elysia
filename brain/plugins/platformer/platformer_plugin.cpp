@@ -47,8 +47,7 @@ public:
     ~SubGame() {
         canvas->destroyEventUnion(event);
         event = NULL;
-        Polarity::Game::getSingleton().stopGame();
-        
+        Polarity::Game::getSingleton().stopGame();        
     }
 };
 
@@ -73,7 +72,7 @@ ELYSIA_PLUGIN_EXPORT_C void init() {
 }
 
 ELYSIA_PLUGIN_EXPORT_C void destroy() {
-//    Elysia::Deinitialize();
+    Polarity::Game::getSingleton().stopGameAndCleanupGraphicsAndEvents();
     core_plugin_refcount--;
 }
 

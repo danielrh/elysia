@@ -10,7 +10,6 @@ ELYSIA_PLUGIN_EXPORT_C void init() {
 }
 
 ELYSIA_PLUGIN_EXPORT_C void destroy() {
-    Elysia::Deinitialize();
     core_plugin_refcount--;
 }
 
