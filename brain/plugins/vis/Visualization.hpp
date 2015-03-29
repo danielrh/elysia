@@ -28,7 +28,12 @@ class Visualization:public BrainPlugin  {
     float mNeuronSize;
     float mScale;
     Vector3f mOffset;
+    int mCanvasWidth;
+    int mCanvasHeight; // updated once per frame
     bool mSynapseSnapToEdge;
+    int fontSize;
+    std::string fontName;
+    int mPadding; //padding around buttons
     Vector3f getNeuronLocation(Neuron*n)const;
     bool getNeuronWidthHeight(const std::string&text, float&width, float&hei, bool selected);
     bool getCurrentNeuronWidthHeight(Neuron*n, float&width, float&height);
@@ -38,6 +43,11 @@ class Visualization:public BrainPlugin  {
     void drawBranch(const Neuron * n, const Branch* dendrite, Vector3f top, float scale) ;
     void drawDendrites(const Neuron* n, const CellComponent* dendrite, Vector3f startLocation, float scale, bool isDetailed, bool isSelected);
     void drawNeuron(Neuron*n);
+    void drawString(Vector3f lower_left, float scale, const std::string &text, bool addspace);
+    std::pair<int, int> transformToScreenSpace(const Vector3f&v) const;
+    void drawAndScreenTransformLine(const Vector3f&v0, const Vector3f&v1, const Polarity::Color&color) const;
+    void drawAndScreenTransformBox(const Vector3f&v0, const Vector3f&v1, const Polarity::Color&color) const;
+
     void doInput();
     typedef std::unordered_set<Neuron*> SelectedNeuronMap;
     SelectedNeuronMap mSelectedNeurons;
@@ -48,6 +58,12 @@ class Visualization:public BrainPlugin  {
     bool click (Neuron*n,float mousex, float mousey);
     ///Returns if a single neuron may be selected by the given drag select box
     bool dragSelect(Neuron *n, float bbminx, float bbminy, float bbmaxx, float bbmaxy);
+    void arrow(Vector3f start, Vector3f finish, float thickness);
+    void arrow (float ox,float oy, float oz, float ex, float ey, float ez, float thickness);
+    void selectionArrow(Vector3f start, Vector3f finish, float thickness, float *col);
+    void drawRect(Vector3f lower_left,Vector3f upper_right);
+    void drawRectOutline(Vector3f lower_left,Vector3f upper_right, float halfx,float halfy);
+    int stringWidth(const std::string &dat, bool addspace, bool removespace);
 public:
     Visualization();
     void draw();

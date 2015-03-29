@@ -37,6 +37,9 @@ public:
             }
         }
         Polarity::Game::getSingleton().performTick();
+        if (isFocused) {
+            Polarity::Game::getSingleton().drawFrame();
+        }
         return RETURN_NOP;
     }
     void notifyNeuronDestruction(Neuron* n) {

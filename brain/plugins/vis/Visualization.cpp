@@ -13,7 +13,8 @@
 #include "Neuron.hpp"
 #include "Brain.hpp"
 #include "Synapse.hpp"
-
+#include <graphics/font_manager.hpp>
+#include <graphics/color.hpp>
 
 using Polarity::Canvas;
 namespace Elysia {
@@ -28,7 +29,7 @@ BrainPlugin* makeVisualization(Brain*b) {
     v->initialize(b);
     return v;
 }
-Visualization::Visualization() : mCanvas(BrainPlugins::returnConstructedCanvas()) {
+Visualization::Visualization() : mCanvas(BrainPlugins::returnConstructedCanvas()), fontSize(12), fontName("DroidSans"), mPadding(4) {
     mEvent = mCanvas->makeBlankEventUnion();
     std::unique_lock<std::mutex> renderLock(*gRenderLock);
     if (std::find(gToRender.begin(),gToRender.end(),this)==gToRender.end()) {
@@ -88,17 +89,21 @@ void Visualization::initialize( Brain*b) {
         bounds=BoundingBox3f3f(Vector3f(-128,-128,-1),Vector3f(128,128,1));
     }
     Vector3f diag=bounds.diag();
-    float ratiox=diag.x/mGraphics->getWidth();
-    float ratioy=diag.y/mGraphics->getHeight();
+    float ratiox=diag.x/mCanvas->width();
+    float ratioy=diag.y/mCanvas->height();
     float maxratio=ratiox>ratioy?ratiox:ratioy;
     mScale=1./maxratio;
     mOffset=-bounds.center();
+    mCanvasWidth = mCanvas->width();
+    mCanvasHeight = mCanvas->height();
 }
 
 
 static float selectiondefaultcol[4]={1,1,1,1};
-static void arrow (float ox,float oy, float oz, float ex, float ey, float ez, float thickness) {
-  thickness=fabs(thickness);
+void Visualization::arrow (float ox,float oy, float oz, float ex, float ey, float ez, float thickness) {
+  int abs_thickness=(int)(thickness < 0 ? -thickness : thickness);
+  if (!abs_thickness) abs_thickness = 1;//arrows are at least thickness one
+
   float dx =ex-ox;
   float dy =ey-oy;
   float ldx=sqrt(dx*dx+dy*dy);
@@ -106,7 +111,6 @@ static void arrow (float ox,float oy, float oz, float ex, float ey, float ez, fl
   dy*=thickness/ldx;
   float idx=-dy;
   float idy=dx;
-
   glVertex3f(ox-idx,oy-idy,oz);
   glVertex3f(ex-idx-3*dx,ey-idy-3*dy,ez);
   glVertex3f(ex+idx-3*dx,ey+idy-3*dy,ez);
@@ -120,8 +124,7 @@ static void arrow (float ox,float oy, float oz, float ex, float ey, float ez, fl
 void Visualization::postInputEvent(const Event&evt){
     mInputEvents.push_back(evt);
 }
-static void selectionArrow(Vector3f start, Vector3f finish, float thickness, float *col=selectiondefaultcol) {
-
+void Visualization::selectionArrow(Vector3f start, Vector3f finish, float thickness, float *col=selectiondefaultcol) {
   float zero[4]={0,0,0,0};
   thickness=fabs(thickness);
   float dx =finish.x-start.x;
@@ -181,18 +184,20 @@ static void selectionArrow(Vector3f start, Vector3f finish, float thickness, flo
   glColor4fv(col);
   glVertex3f(start.x,start.y,start.z);
 }
-void arrow(Vector3f start, Vector3f finish, float thickness) {
+void Visualization::arrow(Vector3f start, Vector3f finish, float thickness) {
 //    printf("Drawing arrow from %f %f %f to %f %f %f t %f\m",           start.x,start.y,start.z,finish.x,finish.y,finish.z,thickness);
-  arrow(start.x,start.y,start.z,finish.x,finish.y,finish.z,thickness);
+    arrow(start.x,start.y,start.z,finish.x,finish.y,finish.z,thickness);
 }
-void drawRect(Vector3f lower_left,Vector3f upper_right) {
+void Visualization::drawRect(Vector3f lower_left,Vector3f upper_right) {
+    Polarity::Color color(255, 255, 255, 255);
     glVertex3f(lower_left.x,lower_left.y,upper_right.z);
     glVertex3f(lower_left.x,upper_right.y,upper_right.z);
     glVertex3f(upper_right.x,upper_right.y,upper_right.z);
     glVertex3f(upper_right.x,lower_left.y,upper_right.z);
     //printf ("drawing from %f %f to %f %f\n",lower_left.x,lower_left.y,upper_right.x,upper_right.y);
+    drawAndScreenTransformBox(lower_left, upper_right, color);
 }
-void drawRectOutline(Vector3f lower_left,Vector3f upper_right, float halfx,float halfy) {
+void Visualization::drawRectOutline(Vector3f lower_left,Vector3f upper_right, float halfx,float halfy) {
     glVertex3f(lower_left.x,lower_left.y-halfy,upper_right.z);
     glVertex3f(lower_left.x,upper_right.y+halfy,upper_right.z);
     glVertex3f(lower_left.x-halfx,upper_right.y,upper_right.z);
@@ -205,13 +210,12 @@ void drawRectOutline(Vector3f lower_left,Vector3f upper_right, float halfx,float
 }
 
 
-int stringWidth(const std::string &dat, bool addspace, bool removespace) {
-	int retval=addspace?1:0;
-	static int space=glutStrokeWidth(GLUT_STROKE_ROMAN,' ');
-	if (removespace) retval-=space-1;
-	for (std::string::const_iterator i=dat.begin(),ie=dat.end();i!=ie;++i)
-		retval+=glutStrokeWidth(GLUT_STROKE_ROMAN,*i);
-	return retval;
+int Visualization::stringWidth(const std::string &dat, bool addspace, bool removespace) {
+    Polarity::Rect retval=mCanvas->fontManager().textSize(fontName, fontSize, addspace?dat + " " : dat);
+    if (removespace) {
+        retval.w -= mCanvas->fontManager().textSize(fontName, fontSize, " ").w;
+    }
+    return retval.w;
 }
 #define highest_special_char ((char)47)
 #define lowest_special_char ((char)35)
@@ -316,8 +320,8 @@ Vector4f getComponentColor(const Visualization *v, const Neuron * n, const CellC
     return getComponentColor(v,n,cc,isDetailed,isSelected);
 }
 Vector3f Visualization::drawNeuronBody(Neuron*n) {
-    Vector3f center=n->getLocation();
-    center.z=0;
+    //Vector3f center=n->getLocation();
+    //center.z=0; FIXME: why not used
     float wid=0;
     float hei=0;
     bool isSelected=mSelectedNeurons.find(n)!=mSelectedNeurons.end();
@@ -349,10 +353,9 @@ void Visualization::drawBranch(const Neuron * n, const Branch* dendrite, Vector3
             float hei=0;
             bool text=getNeuronWidthHeight(destination->getName(), wid,hei,mSelectedNeurons.find(destination)!=mSelectedNeurons.end());
             Vector3f scaledDestination = getNeuronLocation(destination);
-            arrow(scaledDestination-Vector3f(0,hei/2,0),top,1);
+            arrow(scaledDestination-Vector3f(0,hei/2,0), top, 1);
         }
     }
-
 }
 void Visualization::drawDendrites(const Neuron * n, const CellComponent* dendrite, Vector3f top, float scale, bool isDetailed, bool isSelected) {
     CellComponent::ChildIterator i=dendrite->childBegin(),ie=dendrite->childEnd(),b;
@@ -405,16 +408,14 @@ void Visualization::drawNeuron(Neuron*n) {
                 //draw to the center of the neuron then (otherwise the branch will draw to us)
                 Vector3f scaledDestination = getNeuronLocation(destination);
                 Vector3f scaledSource = getNeuronLocation(n);
-                arrow(scaledSource,scaledDestination,1);
+                arrow(scaledSource, scaledDestination,1);
             }
         }
         this->drawDendrites(n, n, top, mScale*2,isDetailed,isSelected);
     }
     
 }
-void printhello() {
-    printf( "HELLO");
-}
+
 Visualization::InputStateMachine::InputStateMachine() {
     memset(mKeyDown,0,sizeof(mKeyDown));
     memset(mSpecialKeyDown,0,sizeof(mSpecialKeyDown));
@@ -423,6 +424,7 @@ Visualization::InputStateMachine::InputStateMachine() {
     mDragStartX=0;
     mDragStartY=0;
 }
+
 void Visualization::clearDetail(){
     this->mDetailedNeurons.clear();
 }
@@ -464,6 +466,31 @@ void Visualization::intersectSelectedWithDetail(){
     }
 }
 
+std::pair<int, int> Visualization::transformToScreenSpace(const Vector3f& v) const{
+    int x0 = v.x + (mCanvasWidth >> 1);
+    int y0 = -v.y + (mCanvasHeight >> 1);
+    return std::pair<int,int>(x0, y0);
+}
+
+void Visualization::drawAndScreenTransformLine(const Vector3f &v0,
+                                              const Vector3f &v1,
+                                              const Polarity::Color &color) const{
+    std::pair<int,int> t0 = transformToScreenSpace(v0);
+    std::pair<int,int> t1 = transformToScreenSpace(v1);
+    mCanvas->drawLine(t0.first, t0.second, t1.first, t1.second, color);
+}
+
+void Visualization::drawAndScreenTransformBox(const Vector3f &v0,
+                                              const Vector3f &v1,
+                                              const Polarity::Color &color) const{
+    std::pair<int,int> t0 = transformToScreenSpace(v0);
+    std::pair<int,int> t1 = transformToScreenSpace(v1);
+    mCanvas->drawLine(t0.first, t0.second, t0.first, t1.second, color);
+    mCanvas->drawLine(t0.first, t1.second, t1.first, t1.second, color);
+    mCanvas->drawLine(t1.first, t1.second, t1.first, t0.second, color);
+    mCanvas->drawLine(t1.first, t0.second, t0.first, t0.second, color);
+}
+
 void Visualization::InputStateMachine::draw(Visualization*parent) {
     static bool xx=false;
     if (!xx) {
@@ -479,6 +506,10 @@ void Visualization::InputStateMachine::draw(Visualization*parent) {
         mButtons[i].draw(parent);
     }
     if (mActiveDrag&&(mMouseX!=mDragStartX||mMouseY!=mDragStartY)) {
+        Polarity::Color color(127, 127, 127, 127);
+        parent->drawAndScreenTransformBox(Vector3f(mDragStartX, mDragStartY, 0),
+                                          Vector3f(mMouseX, mMouseY, 0),
+                                          color);
         glBegin(GL_QUADS);
         glColor4f(.5,.5,.5,.5);
         glVertex3f(mDragStartX,mDragStartY,0);
@@ -604,8 +635,11 @@ Visualization::Button::Button(float minX,
     renderedOnce=false;
     mScale=scale;
 }
-void drawString(Vector3f lower_left, float scale, const std::string &text, bool addspace) {
-
+void Visualization::drawString(Vector3f lower_left, float scale, const std::string &text, bool addspace) {
+    Polarity::Color color(255, 255, 255, 255);
+    std::pair<int, int> ll = transformToScreenSpace(lower_left);
+    ll.second -= fontSize;
+    mCanvas->fontManager().drawText(mCanvas.get(), ll.first, ll.second, fontName, fontSize, color, addspace ? " " + text : text);
     glMatrixMode(GL_MODELVIEW_MATRIX);
     glPushMatrix();
     glTranslatef(lower_left.x,lower_left.y,lower_left.z);
@@ -622,7 +656,7 @@ void Visualization::Button::draw(Visualization * parent) {
         renderedOnce=true;
         bool removespace=false;
         bool addspace=false;    
-        float width = stringWidth(mText, addspace, removespace)*mScale;
+        float width = parent->stringWidth(mText, addspace, removespace) + parent->mPadding;
         if ((maxX-minX)<width) {
             this->maxX=this->minX+width;
         }
@@ -636,7 +670,7 @@ void Visualization::Button::draw(Visualization * parent) {
     Vector3f lower_left(recenterMinX-parent->mGraphics->getWidth()/2,recenterMinY-parent->mGraphics->getHeight()/2,0);
     Vector3f upper_right(recenterMaxX-parent->mGraphics->getWidth()/2,recenterMaxY-parent->mGraphics->getHeight()/2,0);
     glBegin(GL_QUADS);
-    drawRect(lower_left,upper_right);
+    parent->drawRect(lower_left,upper_right);
     glEnd();
 /*
     glBegin(GL_LINES);
@@ -645,7 +679,9 @@ void Visualization::Button::draw(Visualization * parent) {
                     0,0);
                     
                     glEnd();*/
-    drawString(lower_left,mScale,mText,false);
+    lower_left.x += parent->mPadding >> 1;
+    upper_right.x += parent->mPadding >> 1;
+    parent->drawString(lower_left,mScale,mText,false);
 }
 
 void Visualization::InputStateMachine::click(Visualization *vis, const Visualization::Event&evt){
@@ -738,23 +774,30 @@ void Visualization::purgeMarkedForDeathNeurons() {
 }
 
 void Visualization::draw() {
+    mCanvasWidth = mCanvas->width();
+    mCanvasHeight = mCanvas->height();
     purgeMarkedForDeathNeurons();
     doInput();
-    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_BLEND);
-    glBegin(GL_QUADS);
-    glVertex3f(mInput.mMouseX,mInput.mMouseY,0);
-    glVertex3f(mInput.mMouseX,mInput.mMouseY-10,0);
-    glVertex3f(mInput.mMouseX-6,mInput.mMouseY-12,0);
-    glVertex3f(mInput.mMouseX-12,mInput.mMouseY-10,0);
-    for (Brain::NeuronSet::iterator i=mBrain->mAllNeurons.begin(),
-             ie=mBrain->mAllNeurons.end();
-         i!=ie;
-         ++i) {
-        drawNeuron(*i);
+    if (mIsFocused) {
+        mCanvas->beginFrame();
+        mCanvas->clear();
+        glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
+        glBegin(GL_QUADS);
+        glVertex3f(mInput.mMouseX,mInput.mMouseY,0);
+        glVertex3f(mInput.mMouseX,mInput.mMouseY-10,0);
+        glVertex3f(mInput.mMouseX-6,mInput.mMouseY-12,0);
+        glVertex3f(mInput.mMouseX-12,mInput.mMouseY-10,0);
+        for (Brain::NeuronSet::iterator i=mBrain->mAllNeurons.begin(),
+                 ie=mBrain->mAllNeurons.end();
+             i!=ie;
+             ++i) {
+            drawNeuron(*i);
+        }
+        glEnd(); 
+        mInput.draw(this);
+        mCanvas->endFrame();
     }
-    glEnd(); 
-    mInput.draw(this);
 }
 Visualization::~Visualization() {
     {
