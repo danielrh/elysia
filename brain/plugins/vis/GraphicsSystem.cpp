@@ -15,13 +15,6 @@
 namespace Elysia {
 
 //FIXME: where do we get 1024 from
-static int gDisplayWidth=1024;
-static int gDisplayHeight=768;
-void Reshape(int w, int h) {
-    gDisplayWidth=w;
-    gDisplayHeight=h;
-}
-
 int getHeightPartition() {
     int heightPartition=1;
     return heightPartition;
@@ -29,45 +22,49 @@ int getHeightPartition() {
 int getWidthPartition() {
     return 1/getHeightPartition()+(1%getHeightPartition()?1:0);
 }
-float getUpperLeftX(size_t whichSystem) {
-    return (whichSystem%getWidthPartition())*gDisplayWidth;
+float getUpperLeftX(size_t whichSystem, int width) {
+    return (whichSystem%getWidthPartition())*width;
 }
-float getLowerRightX(size_t whichSystem) {
+float getLowerRightX(size_t whichSystem, int width) {
     int wid=getWidthPartition();
-    return (whichSystem%wid)*gDisplayWidth+gDisplayWidth/wid;
+    return (whichSystem%wid)*width+width/wid;
 }
-float getUpperLeftY(size_t whichSystem) {
-    return (whichSystem/getWidthPartition())*gDisplayHeight;
+float getUpperLeftY(size_t whichSystem, int height) {
+    return (whichSystem/getWidthPartition())*height;
 }
-float getLowerRightY(size_t whichSystem) {
+float getLowerRightY(size_t whichSystem, int height) {
     int wid=getWidthPartition();
-    return (whichSystem/wid)*gDisplayHeight+gDisplayHeight/getHeightPartition();
+    return (whichSystem/wid)*height+height/getHeightPartition();
 }
-void getCoordsFromMouse(size_t whichWindow, int x, int y, float&newCoordX, float&newCoordY) {
-    y = gDisplayHeight-y;
+void getCoordsFromMouse(size_t whichWindow, int x, int y, float&newCoordX, float&newCoordY, Polarity::Canvas *canvas) {
+    int w = canvas->width();
+    int h = canvas->height();
+    y = h - y;
     size_t i=whichWindow;
-    float xl=getUpperLeftX(i);
-    float yl=getUpperLeftY(i);
-    float xu=getLowerRightX(i);
-    float yu=getLowerRightY(i);
+    float xl=getUpperLeftX(i, w);
+    float yl=getUpperLeftY(i, h);
+    float xu=getLowerRightX(i, w);
+    float yu=getLowerRightY(i, h);
     newCoordX=(float)(x-(xl+xu)/2);
     newCoordY=(float)(y-(yl+yu)/2);
 }
-size_t getSystemWindowAndCoordsFromMouse(int x, int y, float&newCoordX, float&newCoordY) {
+size_t getSystemWindowAndCoordsFromMouse(int x, int y, float&newCoordX, float&newCoordY, Polarity::Canvas *canvas) {
+    int canvasWidth = canvas->width();
+    int canvasHeight = canvas->height();
     int origx=x;
     int origy=y;
-    y = gDisplayHeight-y;
-    if (x>=gDisplayWidth) x=gDisplayWidth-1;
-    if (y>=gDisplayHeight) y=gDisplayHeight-1;
+    y = canvasHeight-y;
+    if (x>=canvasWidth) x=canvasWidth-1;
+    if (y>=canvasHeight) y=canvasHeight-1;
     if (x<0) x=0;
     if (y<0) y=0;
     for (size_t i=0;i<1;++i) {
-        float xl=getUpperLeftX(i);
-        float yl=getUpperLeftY(i);
-        float xu=getLowerRightX(i);
-        float yu=getLowerRightY(i);
+        float xl=getUpperLeftX(i, canvasWidth);
+        float yl=getUpperLeftY(i, canvasHeight);
+        float xu=getLowerRightX(i, canvasWidth);
+        float yu=getLowerRightY(i, canvasHeight);
         if (x>=xl && xu > x &&y>=yl && yu >y ) {
-            getCoordsFromMouse(i,origx,origy,newCoordX,newCoordY);
+            getCoordsFromMouse(i,origx,origy,newCoordX,newCoordY, canvas);
             return i;
         }
     }
@@ -116,7 +113,7 @@ bool processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
             evt.button = event->button.button - 1;
             evt.modCodes = 0;
             getSystemWindowAndCoordsFromMouse(event->button.x,event->button.y,
-                                              evt.mouseX, evt.mouseY);
+                                              evt.mouseX, evt.mouseY, canvas);
             if (event->type == SDL_MOUSEBUTTONDOWN) {
                 evt.event=Visualization::Event::MOUSE_CLICK;
             }else if (event->type == SDL_MOUSEBUTTONUP) {
@@ -136,7 +133,7 @@ bool processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
                 }
             }
             getSystemWindowAndCoordsFromMouse(event->motion.x,event->motion.y,
-                                              evt.mouseX, evt.mouseY);
+                                              evt.mouseX, evt.mouseY, canvas);
             break;
         }
         vis->postInputEvent(evt);
