@@ -25,6 +25,7 @@ BrainPlugin* makeVisualization(Brain*b) {
     return v;
 }
 Visualization::Visualization() : mCanvas(BrainPlugins::returnConstructedCanvas()), fontSize(12), fontName("DroidSans"), mPadding(4) {
+    mIsFocused = false;
     mEvent = mCanvas->makeBlankEventUnion();
     mNeuronSize=.5;
     mSynapseSnapToEdge=true;

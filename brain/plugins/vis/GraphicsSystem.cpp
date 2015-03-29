@@ -83,7 +83,8 @@ bool processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
     if(event->type == SDL_KEYDOWN && event->key.keysym.sym == SDLK_ESCAPE) {
         return false;
     } else {
-        Visualization::Event evt;
+        Visualization::Event evt = {};
+        bool forward_event = true;
         switch(event->type) {
           case SDL_KEYDOWN:
           case SDL_KEYUP: {
@@ -135,8 +136,13 @@ bool processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
             getSystemWindowAndCoordsFromMouse(event->motion.x,event->motion.y,
                                               evt.mouseX, evt.mouseY, canvas);
             break;
+          default:
+            forward_event = false;
+            break;
         }
-        vis->postInputEvent(evt);
+        if (forward_event) {
+            vis->postInputEvent(evt);
+        }
     }
     return true;
 }
