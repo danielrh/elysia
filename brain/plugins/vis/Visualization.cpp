@@ -19,7 +19,6 @@ static Polarity::Color toColor(const Vector4f&c) {
                            c.z * 255,
                            c.w * 255);
 }
-std::weak_ptr<GraphicsSystem> Visualization::mGlobalGraphics;
 BrainPlugin* makeVisualization(Brain*b) {
     BrainPlugin*v=new Visualization;
     v->initialize(b);

@@ -38,7 +38,7 @@ public:
         }
         Polarity::Game::getSingleton().performTick();
         if (isFocused) {
-            Polarity::Game::getSingleton().drawFrame();
+            Polarity::Game::getSingleton().drawFrame("Press ESC to view current brain");
         }
         return RETURN_NOP;
     }

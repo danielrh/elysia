@@ -22,13 +22,6 @@ void Reshape(int w, int h) {
     gDisplayHeight=h;
 }
 
-int GraphicsSystem::getWidth()const{
-    return gDisplayWidth;
-
-}
-int GraphicsSystem::getHeight()const{
-    return gDisplayHeight;
-}
 int getHeightPartition() {
     int heightPartition=1;
     return heightPartition;
@@ -81,8 +74,8 @@ size_t getSystemWindowAndCoordsFromMouse(int x, int y, float&newCoordX, float&ne
     fprintf(stderr,"Cannot locate window under cursor right now");
     return 0;
 }
-
-bool GraphicsSystem::processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
+namespace GraphicsSystem {
+bool processSDLEvent(Visualization * vis, Polarity::Canvas *canvas,
                                      SDL_Event *event) {
 #ifndef USE_SDL2
     if (event->type == SDL_VIDEORESIZE) {
@@ -152,3 +145,5 @@ bool GraphicsSystem::processSDLEvent(Visualization * vis, Polarity::Canvas *canv
 }
 
 }
+}
+

@@ -6,7 +6,6 @@ class Canvas;
 namespace Elysia {
 class Brain;
 class CellComponent;
-class GraphicsSystem;
 class Neuron;
 class Branch;
 class Visualization:public BrainPlugin  {
@@ -22,8 +21,6 @@ class Visualization:public BrainPlugin  {
     void addSelectedToDetail();
     void subtractSelectedFromDetail();
     void intersectSelectedWithDetail();
-    std::shared_ptr<GraphicsSystem> mGraphics;
-    static std::weak_ptr<GraphicsSystem> mGlobalGraphics;
     Brain * mBrain;
     float mNeuronSize;
     float mScale;

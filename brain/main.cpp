@@ -11,7 +11,6 @@
 #include "SimpleSpatialSearch.hpp"
 #include "SharedLibrary.hpp"
 #include "test.hpp"
-#include "MainThread.hpp"
 #include "BrainPlugins.hpp"
 bool loadFile(const char* fileName, Elysia::Genome::Genome &retval) {
     FILE * fp=fopen(fileName,"rb");
@@ -109,7 +108,7 @@ int asyncMain(int argc, char**argv, bool loadvis) {
     {
         Elysia::Brain brain(&(new Elysia::SimpleProteinEnvironment)->initialize(genes), new Elysia::SimpleSpatialSearch);
         //std::vector<Branch *>BranchestoWipe;
-        for (size_t i=0;i<10000;++i) {
+        for (size_t i=0;i<1000;++i) {
             bool should_continue = brain.tick();
             if (!should_continue) {
                 break;
@@ -125,15 +124,13 @@ int asyncMain(int argc, char**argv, bool loadvis) {
 
 	return 0;
 }
-void asyncMainWrapper(int argc, char**argv, bool loadvis) {
-    asyncMain(argc,argv,loadvis);
-}
 void loadDevelLib(const char*name){
     std::shared_ptr<Elysia::SharedLibrary> item(new Elysia::SharedLibrary(
                                                          Elysia::SharedLibrary::prefix()+name
                                                          +Elysia::SharedLibrary::postfix()+Elysia::SharedLibrary::extension()));
     gPlugins[name]=item;
 }
+
 int main(int argc, char **argv) {
     bool loadvis=true;
     loadDevelLib("naive");
@@ -169,18 +166,5 @@ int main(int argc, char **argv) {
         gPlugins.erase(failedPlugins.back());
         failedPlugins.pop_back();
     }
-    std::shared_ptr<std::thread> formerMain;
-    if (
-#ifdef __APPLE__
-	loadvis
-#else
-    false
-#endif
-        )
-
-    {
-        formerMain=Elysia::MainThread::giveUpMain(std::bind(asyncMainWrapper,argc,argv,true));
-        
-    }else return asyncMain(argc,argv,loadvis);
-    return 0;
+    return asyncMain(argc,argv,loadvis);
 }
