@@ -58,12 +58,12 @@ class Visualization:public BrainPlugin  {
     bool click (Neuron*n,float mousex, float mousey);
     ///Returns if a single neuron may be selected by the given drag select box
     bool dragSelect(Neuron *n, float bbminx, float bbminy, float bbmaxx, float bbmaxy);
-    void arrow(Vector3f start, Vector3f finish, float thickness);
-    void arrow (float ox,float oy, float oz, float ex, float ey, float ez, float thickness);
-    void selectionArrow(Vector3f start, Vector3f finish, float thickness, float *col);
-    void drawRect(Vector3f lower_left,Vector3f upper_right);
+    void arrow(Vector3f start, Vector3f finish, float thickness, const Polarity::Color &c);
+    void arrow (float ox,float oy, float oz, float ex, float ey, float ez, float thickness, const Polarity::Color &c);
+    void drawRect(Vector3f lower_left,Vector3f upper_right, const Polarity::Color&);
     void drawRectOutline(Vector3f lower_left,Vector3f upper_right, float halfx,float halfy);
     int stringWidth(const std::string &dat, bool addspace, bool removespace);
+    void drawParallelogramLineSegment(const Vector3f &source, const Vector3f &dest, double width, const Polarity::Color&);
 public:
     Visualization();
     void draw();

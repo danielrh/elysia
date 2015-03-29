@@ -3,12 +3,6 @@
 #include "genome.pb.h"
 #include "Visualization.hpp"
 #include "GraphicsSystem.hpp"
-#ifdef __APPLE__
-#include "glut.h"
-#else
-#include "GL/glut.h"
-//#include <GL/freeglut.h>
-#endif
 #include "Branch.hpp"
 #include "Neuron.hpp"
 #include "Brain.hpp"
@@ -17,7 +11,14 @@
 #include <graphics/color.hpp>
 
 using Polarity::Canvas;
+
 namespace Elysia {
+static Polarity::Color toColor(const Vector4f&c) {
+    return Polarity::Color(c.x * 255,
+                           c.y * 255,
+                           c.z * 255,
+                           c.w * 255);
+}
 extern std::auto_ptr<std::mutex >gRenderLock;
 extern std::condition_variable gRenderCondition;
 extern std::condition_variable gRenderCompleteCondition;
@@ -100,17 +101,41 @@ void Visualization::initialize( Brain*b) {
 
 
 static float selectiondefaultcol[4]={1,1,1,1};
-void Visualization::arrow (float ox,float oy, float oz, float ex, float ey, float ez, float thickness) {
+void Visualization::arrow (float ox,float oy, float oz, float ex, float ey, float ez, float thickness, const Polarity::Color & color) {
   int abs_thickness=(int)(thickness < 0 ? -thickness : thickness);
   if (!abs_thickness) abs_thickness = 1;//arrows are at least thickness one
 
   float dx =ex-ox;
   float dy =ey-oy;
   float ldx=sqrt(dx*dx+dy*dy);
-  dx*=thickness/ldx;
-  dy*=thickness/ldx;
+  dx*=1/ldx;
+  dy*=1/ldx;
   float idx=-dy;
   float idy=dx;
+  for (int offs = -abs_thickness/2; offs < (abs_thickness + 1) / 2; ++offs) {
+      Vector3f endpoint(ex+ offs * idx,ey + offs * idy,oz);
+      drawAndScreenTransformLine(Vector3f(ox+ offs * idx,oy + offs * idy,oz),
+               endpoint,
+               color);
+      drawAndScreenTransformLine(endpoint,
+               Vector3f(ex-6*dx+3*idx,ey-6*dy+3*idy,ez),
+               color);
+      drawAndScreenTransformLine(endpoint,
+               Vector3f(ex-6*dx-3*idx,ey-6*dy-3*idy,ez),
+               color);             
+/*                 
+  glVertex3f(ex-idx-3*dx,ey-idy-3*dy,ez);
+  glVertex3f(ex+idx-3*dx,ey+idy-3*dy,ez);
+  glVertex3f(ox+idx,oy+idy,oz);
+
+  glVertex3f(ex-3*dx,ey-3*dy,ez);
+  glVertex3f(ex-6*dx+3*idx,ey-6*dy+3*idy,ez);
+  glVertex3f(ex,ey,ez);
+  glVertex3f(ex-6*dx-3*idx,ey-6*dy-3*idy,ez);
+*/    
+
+  }
+/*
   glVertex3f(ox-idx,oy-idy,oz);
   glVertex3f(ex-idx-3*dx,ey-idy-3*dy,ez);
   glVertex3f(ex+idx-3*dx,ey+idy-3*dy,ez);
@@ -120,92 +145,23 @@ void Visualization::arrow (float ox,float oy, float oz, float ex, float ey, floa
   glVertex3f(ex-6*dx+3*idx,ey-6*dy+3*idy,ez);
   glVertex3f(ex,ey,ez);
   glVertex3f(ex-6*dx-3*idx,ey-6*dy-3*idy,ez);
+*/
 }
 void Visualization::postInputEvent(const Event&evt){
     mInputEvents.push_back(evt);
 }
-void Visualization::selectionArrow(Vector3f start, Vector3f finish, float thickness, float *col=selectiondefaultcol) {
-  float zero[4]={0,0,0,0};
-  thickness=fabs(thickness);
-  float dx =finish.x-start.x;
-  float dy =finish.y-start.y;
-  float ldx=sqrt(dx*dx+dy*dy);
-  dx*=thickness*5/ldx;
-  dy*=thickness*5/ldx;
-  float idx=-dy;
-  float idy=dx;
-  Vector3f dd=Vector3f(dx,dy,0);
-  finish=finish-dd*.75f;
-  start=start+dd*.75f;
-  glColor4fv(col);
-  glVertex3f(start.x,start.y,start.z);
-  glColor4fv(col);
-  glVertex3f(finish.x,finish.y,finish.z);
-  glColor4fv(zero);  
-  Vector3f id=Vector3f(idx,idy,0);
-  Vector3f tmp=finish+id;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  tmp=start+id;
-  glColor4fv(zero);  
-  glVertex3f(tmp.x,tmp.y,tmp.z);
 
-  glColor4fv(col);
-  glVertex3f(finish.x,finish.y,finish.z);
-  glColor4fv(col);
-  glVertex3f(start.x,start.y,start.z); 
-  glColor4fv(zero);
-  tmp=start-id;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  tmp=finish-id;
-  glColor4fv(zero);
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-
-  glColor4fv(zero);
-  tmp=finish-id;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  glColor4fv(zero);
-  tmp=finish+dd*2;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  glColor4fv(zero);
-  tmp=finish+id;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  glColor4fv(col);
-  glVertex3f(finish.x,finish.y,finish.z);
-
-  glColor4fv(zero);
-  tmp=start-id;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  glColor4fv(zero);
-  tmp=start-dd*2;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  glColor4fv(zero);
-  tmp=start+id;
-  glVertex3f(tmp.x,tmp.y,tmp.z);
-  glColor4fv(col);
-  glVertex3f(start.x,start.y,start.z);
-}
-void Visualization::arrow(Vector3f start, Vector3f finish, float thickness) {
+void Visualization::arrow(Vector3f start, Vector3f finish, float thickness, const Polarity::Color&c) {
 //    printf("Drawing arrow from %f %f %f to %f %f %f t %f\m",           start.x,start.y,start.z,finish.x,finish.y,finish.z,thickness);
-    arrow(start.x,start.y,start.z,finish.x,finish.y,finish.z,thickness);
+    arrow(start.x,start.y,start.z,finish.x,finish.y,finish.z,thickness, c);
 }
-void Visualization::drawRect(Vector3f lower_left,Vector3f upper_right) {
-    Polarity::Color color(255, 255, 255, 255);
-    glVertex3f(lower_left.x,lower_left.y,upper_right.z);
-    glVertex3f(lower_left.x,upper_right.y,upper_right.z);
-    glVertex3f(upper_right.x,upper_right.y,upper_right.z);
-    glVertex3f(upper_right.x,lower_left.y,upper_right.z);
+void Visualization::drawRect(Vector3f lower_left,Vector3f upper_right, const Polarity::Color&color) {
     //printf ("drawing from %f %f to %f %f\n",lower_left.x,lower_left.y,upper_right.x,upper_right.y);
     drawAndScreenTransformBox(lower_left, upper_right, color);
 }
 void Visualization::drawRectOutline(Vector3f lower_left,Vector3f upper_right, float halfx,float halfy) {
-    glVertex3f(lower_left.x,lower_left.y-halfy,upper_right.z);
-    glVertex3f(lower_left.x,upper_right.y+halfy,upper_right.z);
-    glVertex3f(lower_left.x-halfx,upper_right.y,upper_right.z);
-    glVertex3f(upper_right.x+halfx,upper_right.y,upper_right.z);
-    glVertex3f(upper_right.x,upper_right.y+halfy,upper_right.z);
-    glVertex3f(upper_right.x,lower_left.y-halfy,upper_right.z);
-    glVertex3f(upper_right.x+halfx,lower_left.y,upper_right.z);
-    glVertex3f(lower_left.x-halfx,lower_left.y,upper_right.z);
+    Polarity::Color color(255, 255, 255, 255);
+    drawAndScreenTransformBox(lower_left, upper_right, color);
 
 }
 
@@ -330,17 +286,18 @@ Vector3f Visualization::drawNeuronBody(Neuron*n) {
     //printf ("aaawing from %f %f to %f %f\n",((center-Vector3f(wid/2,hei/2,0))).x,((center-Vector3f(wid/2,hei/2,0))).y,((center+Vector3f(wid/2,hei/2,0))).x,(center+Vector3f(wid/2,hei/2,0)).y);
     Vector3f scaledCenter=getNeuronLocation(n);
     Vector4f color = getComponentColor(this,n,n);
-    glColor4f(color.x,color.y,color.z,color.w);
-    drawRect(scaledCenter-Vector3f(wid/2,hei/2,0),scaledCenter+Vector3f(wid/2,hei/2,0));
+    drawRect(scaledCenter-Vector3f(wid/2,hei/2,0),scaledCenter+Vector3f(wid/2,hei/2,0), toColor(color));
     return scaledCenter+Vector3f(0,hei/2,0);
 }
 
-void drawParallelogramLineSegment(const Vector3f &source, const Vector3f &dest, double width) {
-    width*=.5;
-    glVertex3f(source.x-width,source.y,source.z);
-    glVertex3f(dest.x-width,dest.y,dest.z);
-    glVertex3f(dest.x+width,dest.y,dest.z);
-    glVertex3f(source.x+width,source.y,source.z);
+void Visualization::drawParallelogramLineSegment(const Vector3f &source, const Vector3f &dest, double thickness, const Polarity::Color & color) {
+  int abs_thickness=(int)(thickness < 0 ? -thickness : thickness);
+  if (!abs_thickness) abs_thickness = 1;//arrows are at least thickness one
+    for (int offs = -abs_thickness/2; offs < (abs_thickness + 1) / 2; ++offs) {
+        drawAndScreenTransformLine(Vector3f(source.x + offs, source.y, source.z),
+                                   Vector3f(dest.x + offs, dest.y, dest.z),
+                                   color);
+    }
 }
 
 void Visualization::drawBranch(const Neuron * n, const Branch* dendrite, Vector3f top, float scale) {
@@ -348,12 +305,11 @@ void Visualization::drawBranch(const Neuron * n, const Branch* dendrite, Vector3
         Neuron * destination = (*i)->recipient();
         if (destination) {
             Vector4f color = getComponentColor(this,destination, destination);
-            glColor4f(color.x,color.y,color.z,color.w);
             float wid=0;
             float hei=0;
             bool text=getNeuronWidthHeight(destination->getName(), wid,hei,mSelectedNeurons.find(destination)!=mSelectedNeurons.end());
             Vector3f scaledDestination = getNeuronLocation(destination);
-            arrow(scaledDestination-Vector3f(0,hei/2,0), top, 1);
+            arrow(scaledDestination-Vector3f(0,hei/2,0), top, 1, toColor(color));
         }
     }
 }
@@ -372,8 +328,7 @@ void Visualization::drawDendrites(const Neuron * n, const CellComponent* dendrit
                                  top.z);        
         if (scale) {
             Vector4f color = getComponentColor(this,n, *i,isDetailed,isSelected);
-            glColor4f(color.x,color.y,color.z,color.w);
-            drawParallelogramLineSegment(top,dest,width);
+            drawParallelogramLineSegment(top,dest,width, toColor(color));
         }
         const CellComponent *nextInLine = *i;
         drawDendrites(n,nextInLine,scale?dest:top,scale*.5,isDetailed,isSelected);
@@ -408,7 +363,7 @@ void Visualization::drawNeuron(Neuron*n) {
                 //draw to the center of the neuron then (otherwise the branch will draw to us)
                 Vector3f scaledDestination = getNeuronLocation(destination);
                 Vector3f scaledSource = getNeuronLocation(n);
-                arrow(scaledSource, scaledDestination,1);
+                arrow(scaledSource, scaledDestination,1, toColor(getComponentColor(this, n, n)));
             }
         }
         this->drawDendrites(n, n, top, mScale*2,isDetailed,isSelected);
@@ -510,13 +465,6 @@ void Visualization::InputStateMachine::draw(Visualization*parent) {
         parent->drawAndScreenTransformBox(Vector3f(mDragStartX, mDragStartY, 0),
                                           Vector3f(mMouseX, mMouseY, 0),
                                           color);
-        glBegin(GL_QUADS);
-        glColor4f(.5,.5,.5,.5);
-        glVertex3f(mDragStartX,mDragStartY,0);
-        glVertex3f(mDragStartX,mMouseY,0);
-        glVertex3f(mMouseX,mMouseY,0);
-        glVertex3f(mMouseX,mDragStartY,0);
-        glEnd();
     }
 }
 void Visualization::InputStateMachine::processPersistentState(const Visualization::Event&evt) {
@@ -640,16 +588,6 @@ void Visualization::drawString(Vector3f lower_left, float scale, const std::stri
     std::pair<int, int> ll = transformToScreenSpace(lower_left);
     ll.second -= fontSize;
     mCanvas->fontManager().drawText(mCanvas.get(), ll.first, ll.second, fontName, fontSize, color, addspace ? " " + text : text);
-    glMatrixMode(GL_MODELVIEW_MATRIX);
-    glPushMatrix();
-    glTranslatef(lower_left.x,lower_left.y,lower_left.z);
-    glScalef(scale,scale,scale);
-    if (addspace)
-        glutStrokeCharacter(GLUT_STROKE_ROMAN,' ');
-    for (size_t i=0;i<text.length();++i) {
-        glutStrokeCharacter(GLUT_STROKE_ROMAN,text[i]);
-    }
-    glPopMatrix();
 }
 void Visualization::Button::draw(Visualization * parent) {
     if (!renderedOnce) {
@@ -669,16 +607,6 @@ void Visualization::Button::draw(Visualization * parent) {
     
     Vector3f lower_left(recenterMinX-parent->mGraphics->getWidth()/2,recenterMinY-parent->mGraphics->getHeight()/2,0);
     Vector3f upper_right(recenterMaxX-parent->mGraphics->getWidth()/2,recenterMaxY-parent->mGraphics->getHeight()/2,0);
-    glBegin(GL_QUADS);
-    parent->drawRect(lower_left,upper_right);
-    glEnd();
-/*
-    glBegin(GL_LINES);
-    drawRectOutline(lower_left,
-                    upper_right,
-                    0,0);
-                    
-                    glEnd();*/
     lower_left.x += parent->mPadding >> 1;
     upper_right.x += parent->mPadding >> 1;
     parent->drawString(lower_left,mScale,mText,false);
@@ -781,20 +709,17 @@ void Visualization::draw() {
     if (mIsFocused) {
         mCanvas->beginFrame();
         mCanvas->clear();
-        glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_BLEND);
-        glBegin(GL_QUADS);
-        glVertex3f(mInput.mMouseX,mInput.mMouseY,0);
-        glVertex3f(mInput.mMouseX,mInput.mMouseY-10,0);
-        glVertex3f(mInput.mMouseX-6,mInput.mMouseY-12,0);
-        glVertex3f(mInput.mMouseX-12,mInput.mMouseY-10,0);
+        // do we need a cursor here?
+        // glVertex3f(mInput.mMouseX,mInput.mMouseY,0);
+        // glVertex3f(mInput.mMouseX,mInput.mMouseY-10,0);
+        // glVertex3f(mInput.mMouseX-6,mInput.mMouseY-12,0);
+        // glVertex3f(mInput.mMouseX-12,mInput.mMouseY-10,0);
         for (Brain::NeuronSet::iterator i=mBrain->mAllNeurons.begin(),
                  ie=mBrain->mAllNeurons.end();
              i!=ie;
              ++i) {
             drawNeuron(*i);
         }
-        glEnd(); 
         mInput.draw(this);
         mCanvas->endFrame();
     }
